@@ -1,4 +1,4 @@
-# Copyright 2022 Thoughtworks, Inc.
+# Copyright 2023 Thoughtworks, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,34 +19,37 @@
 
 FROM curlimages/curl:latest as gocd-server-unzip
 USER root
+ARG TARGETARCH
 ARG UID=1000
-RUN curl --fail --location --silent --show-error "https://download.gocd.org/binaries/22.3.0-15301/generic/go-server-22.3.0-15301.zip" > /tmp/go-server-22.3.0-15301.zip && \
-    unzip /tmp/go-server-22.3.0-15301.zip -d / && \
+RUN curl --fail --location --silent --show-error "https://download.gocd.org/binaries/23.1.0-16079/generic/go-server-23.1.0-16079.zip" > /tmp/go-server-23.1.0-16079.zip && \
+    unzip -q /tmp/go-server-23.1.0-16079.zip -d / && \
     mkdir -p /go-server/wrapper /go-server/bin && \
-    mv /go-server-22.3.0/LICENSE /go-server/LICENSE && \
-    mv /go-server-22.3.0/bin/go-server /go-server/bin/go-server && \
-    mv /go-server-22.3.0/lib /go-server/lib && \
-    mv /go-server-22.3.0/logs /go-server/logs && \
-    mv /go-server-22.3.0/run /go-server/run && \
-    mv /go-server-22.3.0/wrapper-config /go-server/wrapper-config && \
-    mv /go-server-22.3.0/wrapper/wrapper-linux* /go-server/wrapper/ && \
-    mv /go-server-22.3.0/wrapper/libwrapper-linux* /go-server/wrapper/ && \
-    mv /go-server-22.3.0/wrapper/wrapper.jar /go-server/wrapper/ && \
+    mv -v /go-server-23.1.0/LICENSE /go-server/LICENSE && \
+    mv -v /go-server-23.1.0/bin/go-server /go-server/bin/go-server && \
+    mv -v /go-server-23.1.0/lib /go-server/lib && \
+    mv -v /go-server-23.1.0/logs /go-server/logs && \
+    mv -v /go-server-23.1.0/run /go-server/run && \
+    mv -v /go-server-23.1.0/wrapper-config /go-server/wrapper-config && \
+    WRAPPERARCH=$(if [ $TARGETARCH == amd64 ]; then echo x86-64; elif [ $TARGETARCH == arm64 ]; then echo arm-64; else echo $TARGETARCH is unknown!; exit 1; fi) && \
+    mv -v /go-server-23.1.0/wrapper/wrapper-linux-$WRAPPERARCH* /go-server/wrapper/ && \
+    mv -v /go-server-23.1.0/wrapper/libwrapper-linux-$WRAPPERARCH* /go-server/wrapper/ && \
+    mv -v /go-server-23.1.0/wrapper/wrapper.jar /go-server/wrapper/ && \
     chown -R ${UID}:0 /go-server && chmod -R g=u /go-server
 
 FROM quay.io/centos/centos:stream9
+ARG TARGETARCH
 
-LABEL gocd.version="22.3.0" \
+LABEL gocd.version="23.1.0" \
   description="GoCD server based on quay.io/centos/centos:stream9" \
   maintainer="GoCD Team <go-cd-dev@googlegroups.com>" \
   url="https://www.gocd.org" \
-  gocd.full.version="22.3.0-15301" \
-  gocd.git.sha="9d23ed19a9ea46eaf7f18bd16671ae0569871f53"
+  gocd.full.version="23.1.0-16079" \
+  gocd.git.sha="21e78c998e1eb35d8d489c1d3e3e9813dc18233a"
 
 # the ports that GoCD server runs on
 EXPOSE 8153
 
-ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini-static-amd64 /usr/local/sbin/tini
+ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini-static-${TARGETARCH} /usr/local/sbin/tini
 
 # force encoding
 ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8
@@ -63,12 +66,14 @@ RUN \
 # add user to root group for GoCD to work on openshift
   useradd -l -u ${UID} -g root -d /home/go -m go && \
   dnf install --assumeyes glibc-langpack-en epel-release && \
+  echo 'fastestmirror=1' >> /etc/dnf/dnf.conf && \
+  echo 'install_weak_deps=False' >> /etc/dnf/dnf.conf && \
   dnf update -y && \
   dnf upgrade -y && \
   dnf install -y git mercurial subversion openssh-clients bash unzip procps procps-ng coreutils-single curl-minimal && \
   dnf clean all && \
   rm -rf /var/cache/dnf && \
-  curl --fail --location --silent --show-error 'https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.5%2B8/OpenJDK17U-jre_x64_linux_hotspot_17.0.5_8.tar.gz' --output /tmp/jre.tar.gz && \
+  curl --fail --location --silent --show-error "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.6%2B10/OpenJDK17U-jre_$(uname -m | sed -e s/86_//g)_linux_hotspot_17.0.6_10.tar.gz" --output /tmp/jre.tar.gz && \
   mkdir -p /gocd-jre && \
   tar -xf /tmp/jre.tar.gz -C /gocd-jre --strip 1 && \
   rm -rf /tmp/jre.tar.gz && \
