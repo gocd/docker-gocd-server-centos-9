@@ -21,30 +21,30 @@ FROM curlimages/curl:latest as gocd-server-unzip
 USER root
 ARG TARGETARCH
 ARG UID=1000
-RUN curl --fail --location --silent --show-error "https://download.gocd.org/binaries/23.1.0-16079/generic/go-server-23.1.0-16079.zip" > /tmp/go-server-23.1.0-16079.zip && \
-    unzip -q /tmp/go-server-23.1.0-16079.zip -d / && \
+RUN curl --fail --location --silent --show-error "https://download.gocd.org/binaries/23.2.0-16938/generic/go-server-23.2.0-16938.zip" > /tmp/go-server-23.2.0-16938.zip && \
+    unzip -q /tmp/go-server-23.2.0-16938.zip -d / && \
     mkdir -p /go-server/wrapper /go-server/bin && \
-    mv -v /go-server-23.1.0/LICENSE /go-server/LICENSE && \
-    mv -v /go-server-23.1.0/bin/go-server /go-server/bin/go-server && \
-    mv -v /go-server-23.1.0/lib /go-server/lib && \
-    mv -v /go-server-23.1.0/logs /go-server/logs && \
-    mv -v /go-server-23.1.0/run /go-server/run && \
-    mv -v /go-server-23.1.0/wrapper-config /go-server/wrapper-config && \
+    mv -v /go-server-23.2.0/LICENSE /go-server/LICENSE && \
+    mv -v /go-server-23.2.0/bin/go-server /go-server/bin/go-server && \
+    mv -v /go-server-23.2.0/lib /go-server/lib && \
+    mv -v /go-server-23.2.0/logs /go-server/logs && \
+    mv -v /go-server-23.2.0/run /go-server/run && \
+    mv -v /go-server-23.2.0/wrapper-config /go-server/wrapper-config && \
     WRAPPERARCH=$(if [ $TARGETARCH == amd64 ]; then echo x86-64; elif [ $TARGETARCH == arm64 ]; then echo arm-64; else echo $TARGETARCH is unknown!; exit 1; fi) && \
-    mv -v /go-server-23.1.0/wrapper/wrapper-linux-$WRAPPERARCH* /go-server/wrapper/ && \
-    mv -v /go-server-23.1.0/wrapper/libwrapper-linux-$WRAPPERARCH* /go-server/wrapper/ && \
-    mv -v /go-server-23.1.0/wrapper/wrapper.jar /go-server/wrapper/ && \
+    mv -v /go-server-23.2.0/wrapper/wrapper-linux-$WRAPPERARCH* /go-server/wrapper/ && \
+    mv -v /go-server-23.2.0/wrapper/libwrapper-linux-$WRAPPERARCH* /go-server/wrapper/ && \
+    mv -v /go-server-23.2.0/wrapper/wrapper.jar /go-server/wrapper/ && \
     chown -R ${UID}:0 /go-server && chmod -R g=u /go-server
 
-FROM quay.io/centos/centos:stream9
+FROM quay.io/centos/centos:stream9-minimal
 ARG TARGETARCH
 
-LABEL gocd.version="23.1.0" \
-  description="GoCD server based on quay.io/centos/centos:stream9" \
+LABEL gocd.version="23.2.0" \
+  description="GoCD server based on quay.io/centos/centos:stream9-minimal" \
   maintainer="GoCD Team <go-cd-dev@googlegroups.com>" \
   url="https://www.gocd.org" \
-  gocd.full.version="23.1.0-16079" \
-  gocd.git.sha="21e78c998e1eb35d8d489c1d3e3e9813dc18233a"
+  gocd.full.version="23.2.0-16938" \
+  gocd.git.sha="e2b2936f3b573008381a3702139ebcb4383dc0b1"
 
 # the ports that GoCD server runs on
 EXPOSE 8153
@@ -61,19 +61,17 @@ RUN \
 # add mode and permissions for files we added above
   chmod 0755 /usr/local/sbin/tini && \
   chown root:root /usr/local/sbin/tini && \
-# add our user and group first to make sure their IDs get assigned consistently,
-# regardless of whatever dependencies get added
-# add user to root group for GoCD to work on openshift
-  useradd -l -u ${UID} -g root -d /home/go -m go && \
-  dnf install --assumeyes glibc-langpack-en epel-release && \
   echo 'fastestmirror=1' >> /etc/dnf/dnf.conf && \
   echo 'install_weak_deps=False' >> /etc/dnf/dnf.conf && \
-  dnf update -y && \
-  dnf upgrade -y && \
-  dnf install -y git mercurial subversion openssh-clients bash unzip procps procps-ng coreutils-single curl-minimal && \
-  dnf clean all && \
-  rm -rf /var/cache/dnf && \
-  curl --fail --location --silent --show-error "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.6%2B10/OpenJDK17U-jre_$(uname -m | sed -e s/86_//g)_linux_hotspot_17.0.6_10.tar.gz" --output /tmp/jre.tar.gz && \
+  microdnf upgrade -y && \
+  microdnf install -y shadow-utils && \
+# add our user and group first to make sure their IDs get assigned consistently, regardless of whatever dependencies get added
+  useradd -l -u ${UID} -g root -d /home/go -m go && \
+  microdnf install -y glibc-langpack-en tar tzdata epel-release epel-next-release && \
+  microdnf install -y mercurial subversion openssh-clients bash unzip procps git-core procps-ng coreutils-single curl-minimal && \
+  microdnf clean all && \
+  rm -rf /var/cache/microdnf && \
+  curl --fail --location --silent --show-error "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.8%2B7/OpenJDK17U-jre_$(uname -m | sed -e s/86_//g)_linux_hotspot_17.0.8_7.tar.gz" --output /tmp/jre.tar.gz && \
   mkdir -p /gocd-jre && \
   tar -xf /tmp/jre.tar.gz -C /gocd-jre --strip 1 && \
   rm -rf /tmp/jre.tar.gz && \
